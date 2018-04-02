@@ -7,20 +7,22 @@ class AVLTree<T extends Comparable<T>> {
 		protected T elementExtra;
 		protected AVLNode<T> left;
 		protected AVLNode<T> right;
+		protected AVLNode<T> parent;
 		
 		//create a node without child.
-		public AVLNode(int element, T elementExtra){
-			this(element, elementExtra, null,null);
+		public AVLNode(int element, T elementExtra, AVLNode<T> parent){
+			this(element, elementExtra, null, null, parent);
 			if(this.element != Integer.MIN_VALUE) 
 				expandExteral(this);
 		}
 
 		//create a node with children.
-		public AVLNode(int element, T elementExtra, AVLNode<T> left, AVLNode<T> right) {
+		public AVLNode(int element, T elementExtra, AVLNode<T> left, AVLNode<T> right, AVLNode<T> parent) {
 			this.element = element;
 			this.elementExtra = elementExtra;
 			this.left = left;
 			this.right = right;
+			this.parent = parent;
 		}
 		
 		//change the value of elementExtra in an internal node
@@ -31,8 +33,8 @@ class AVLTree<T extends Comparable<T>> {
 		
 		//create two external children
 		public void expandExteral(AVLNode<T> cell) {
-			cell.left = new AVLNode(Integer.MIN_VALUE, null);
-			cell.right = new AVLNode(Integer.MIN_VALUE, null);
+			cell.left = new AVLNode<T>(Integer.MIN_VALUE, null, cell);
+			cell.right = new AVLNode<T>(Integer.MIN_VALUE, null, cell);
 		}
 	}
 	
@@ -40,7 +42,7 @@ class AVLTree<T extends Comparable<T>> {
 	
 	//initialize the tree
 	public AVLTree() {
-		root = null;
+		root = new AVLNode<T>(Integer.MIN_VALUE, null, null);
 	}
 	
 	//check whether the tree is empty
@@ -77,22 +79,6 @@ class AVLTree<T extends Comparable<T>> {
 	   }
 	 }
 	 
-	//find the parent of cell start from the root of the tree
-	//never start checking the right subtree until cell not found in the left subtree
-	public AVLNode<T> parent(AVLNode<T> check, AVLNode<T> cell){
-		if(check == null) {
-			return null;
-		}else if(check == cell) {
-			return null;
-		}else if((check.left == cell) || (check.right == cell)) {
-			return check;
-		}else if(parent(check.left, cell) != null){ 
-			return parent(check.left, cell);
-		}else {
-			return parent(check.right, cell);
-		}
-	}
-	
 	//find the higher child of cell
 	public AVLNode<T> higherChild(AVLNode<T> cell){
 		return getHeight(cell.left) > getHeight(cell.right) ? cell.left : cell.right;
@@ -141,9 +127,10 @@ class AVLTree<T extends Comparable<T>> {
 	//level(depth) of a particular node
 	public int getLevel(AVLNode<T> cell) {
 		int countAnc = 0;
-		while(parent(root, cell) != null) {
-			cell = parent(root, cell);
+		while(cell != root) {
+			cell = cell.parent;
 			countAnc++;
+			if(cell == root) break;
 		}
 		return countAnc;
 	}
@@ -155,8 +142,8 @@ class AVLTree<T extends Comparable<T>> {
 	
 	//find the first unbalanced node start from cell
 	public AVLNode<T> findUnbalanced(AVLNode<T> cell){
-		while(parent(root, cell) != null) {
-			cell = parent(root, cell);
+		while(cell.parent != null) {
+			cell = cell.parent;
 			if(checkUnbalanced(cell)) return cell;
 		}
 		return null;
@@ -222,9 +209,9 @@ class AVLTree<T extends Comparable<T>> {
 		if(getLevel(cell) > 1) {
 			while(cell != root) {
 				cell = resturcture(cell);
+				if(cell == root) cell.parent = null;
 				if(cell == null) break;
-				if(parent(root, cell) == null) 
-					root = cell;
+				if(cell.parent == null) root = cell;
 			}
 		}
 	}
@@ -232,22 +219,38 @@ class AVLTree<T extends Comparable<T>> {
 	//single rotation: parameter sequence follows (z, y, x)
 	//double rotation: parameter sequence follows (y, x, z)
 	public void rotation(AVLNode<T> first, AVLNode<T> second, AVLNode<T> third){
-		AVLNode<T> parentFirst = parent(root,first);
+		AVLNode<T> parentFirst = first.parent;
 		
 		if(first.element > third.element) {  
 			first.left = second.right;
+			second.right.parent = first;
 			if(parentFirst != null) {
-				if(parentFirst.left == first)  parentFirst.left = second;
-				if(parentFirst.right == first)  parentFirst.right = second;
+				if(parentFirst.left == first) {
+					parentFirst.left = second;
+					second.parent = parentFirst;
+				}
+				if(parentFirst.right == first) {
+					parentFirst.right = second;
+					second.parent = parentFirst;
+				}
 			}
 			second.right = first;
+			first.parent = second;
 		}else if(first.element < third.element) {
 			first.right = second.left;
+			second.left.parent = first;
 			if(parentFirst != null) {
-				if(parentFirst.left == first)  parentFirst.left = second;
-				if(parentFirst.right == first)  parentFirst.right = second;
+				if(parentFirst.left == first) {
+					parentFirst.left = second;
+					second.parent = parentFirst;
+				}
+				if(parentFirst.right == first) {
+					parentFirst.right = second;
+					second.parent = parentFirst;
+				}
 			}
 			second.left = first;
+			first.parent = second;
 			
 			if(parentFirst == null) root = second;
 		}
@@ -271,7 +274,7 @@ class AVLTree<T extends Comparable<T>> {
 	//swap values between two nodes
 	public AVLNode<T> swap(AVLNode<T> cell) {
 		AVLNode<T> replace = smallestRight(cell.right);
-		AVLNode<T> media = new AVLNode<T>(0, null);
+		AVLNode<T> media = new AVLNode<T>(0, null, null);
 		
 		media.element  = cell.element;
 		cell.element = replace.element;
@@ -287,7 +290,7 @@ class AVLTree<T extends Comparable<T>> {
 	
 	//change reference among parent and child
 	public AVLNode<T> checkLeftRight(AVLNode<T> cell) {
-		AVLNode<T> check = parent(root, cell);
+		AVLNode<T> check = cell.parent;
 		if(check.left == cell) return check.left;
 		if(check.right == cell) return check.right;
 		return null;
@@ -295,15 +298,15 @@ class AVLTree<T extends Comparable<T>> {
 	
 	//delete a node
 	public AVLNode<T> delete(AVLNode<T> cell) {
-		AVLNode<T> check = parent(root, cell);
+		AVLNode<T> check = cell.parent;
 		if(countInChild(cell) == 0) {
 			 //changeRefer(check, new AVLNode(Integer.MIN_VALUE, null));
 			 if(check.left == cell) {
-				 check.left = new AVLNode(Integer.MIN_VALUE, null);
+				 check.left = new AVLNode<T>(Integer.MIN_VALUE, null, check);
 				 return check.left;
 			 }
 			 if(check.right == cell) {
-				 check.right = new AVLNode(Integer.MIN_VALUE, null);
+				 check.right = new AVLNode<T>(Integer.MIN_VALUE, null, check);
 				 return check.right;
 			 }
 		 }else if(countInChild(cell) == 1) {
@@ -324,9 +327,6 @@ class AVLTree<T extends Comparable<T>> {
 	
 	//insert a new node
 	public void insert(int element, T elementExtra) {
-		if(root == null) {
-			root = new AVLNode(element, elementExtra);
-		}
 		AVLNode<T> cell = find(root, element);
 		if(cell.element == Integer.MIN_VALUE) {
 			cell.setValue(element, elementExtra);
